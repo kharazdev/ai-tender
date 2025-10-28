@@ -1,8 +1,60 @@
 // File: app/actions.ts
+// --- MODIFIED FILE ---
 
-'use server'; // <-- Most important line! This marks all functions in this file as Server Actions.
+'use server';
 
+import { sql } from '@vercel/postgres'; // Using vercel/postgres for consistency
+import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+
+// --- NEW SETTINGS ACTIONS START ---
+
+/**
+ * Fetches the global prompt from the database.
+ * @returns {Promise<string>} The global prompt text, or an empty string if not found.
+ */
+export async function getGlobalPrompt(): Promise<string> {
+  try {
+    const { rows } = await sql`SELECT value FROM "Settings" WHERE key = 'globalPrompt' LIMIT 1`;
+    return rows[0]?.value || '';
+  } catch (error) {
+    console.error('Failed to fetch global prompt:', error);
+    return ''; // Return empty on error to prevent crashes
+  }
+}
+
+/**
+ * Updates or creates the global prompt in the database.
+ * @param {string} newPrompt - The new text for the global prompt.
+ * @returns {Promise<{success: boolean, message: string}>} Result object.
+ */
+export async function updateGlobalPrompt(newPrompt: string) {
+  // Basic validation
+  if (typeof newPrompt !== 'string') {
+    return { success: false, message: 'Invalid prompt format.' };
+  }
+
+  try {
+    // UPSERT operation: Insert if key doesn't exist, update if it does.
+    await sql`
+      INSERT INTO "Settings" (key, value)
+      VALUES ('globalPrompt', ${newPrompt})
+      ON CONFLICT (key)
+      DO UPDATE SET value = EXCLUDED.value, "updatedAt" = CURRENT_TIMESTAMP;
+    `;
+    
+    // Revalidate the settings page path to show the updated value if user reloads
+    revalidatePath('/settings');
+    
+    return { success: true, message: 'Global prompt saved successfully!' };
+  } catch (error) {
+    console.error('Failed to update global prompt:', error);
+    return { success: false, message: 'Database error. Could not save prompt.' };
+  }
+}
+
+// --- NEW SETTINGS ACTIONS END ---
+
 
 // Define the shape of the message history we expect from the client
 const messageSchema = z.object({
@@ -12,7 +64,7 @@ const messageSchema = z.object({
 
 // The main Server Action function
 export async function sendMessage(
-  personaInstruction: string, 
+  personaInstruction: string,
   history: z.infer<typeof messageSchema>[],
   newMessage: string
 ) {
@@ -21,35 +73,41 @@ export async function sendMessage(
   const API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
   if (!GOOGLE_API_KEY) {
-    // This will be returned to the client if the key is missing
     return "Error: The GOOGLE_API_KEY is not configured on the server.";
   }
 
-  // 2. Prepare the data in the format Gemini API expects
+  // --- MODIFICATION: INTEGRATE GLOBAL PROMPT ---
+  const globalPrompt = await getGlobalPrompt();
   const NEGATIVE_INSTRUCTION = `Absolutely do NOT mention that you are an AI, a bot, a large language model, a machine, a computer program, artificial intelligence, or anything similar. Do not break character or refer to yourself as anything other than the persona you are roleplaying.`;
-  const finalSystemInstruction = `${personaInstruction} ${NEGATIVE_INSTRUCTION}`;
+  
+  // Combine prompts, filtering out any empty strings to avoid extra spaces.
+  const finalSystemInstruction = [
+    globalPrompt,
+    personaInstruction,
+    NEGATIVE_INSTRUCTION
+  ].filter(Boolean).join(' ');
+  // --- END OF MODIFICATION ---
+
 
   // Gemini expects "parts" instead of "content"
   const contents = history.map(msg => ({
     role: msg.role,
     parts: [{ text: msg.content }]
   }));
-  // Add the new user message to the history for this API call
   contents.push({ role: 'user', parts: [{ text: newMessage }] });
 
   const apiRequestBody = {
     contents: contents,
     systemInstruction: {
-        parts: [{ text: finalSystemInstruction }]
+      parts: [{ text: finalSystemInstruction }]
     },
     generationConfig: {
-        temperature: 0.7,
-        topP: 0.95,
-        topK: 40
+      temperature: 0.7,
+      topP: 0.95,
+      topK: 40
     }
   };
 
-  // 3. Make the API call
   try {
     const response = await fetch(`${API_BASE_URL}?key=${GOOGLE_API_KEY}`, {
       method: 'POST',
@@ -57,34 +115,24 @@ export async function sendMessage(
       body: JSON.stringify(apiRequestBody),
     });
 
-    // --- IMPROVED ERROR HANDLING BLOCK ---
     if (!response.ok) {
       let errorText = `API Error: ${response.status} ${response.statusText}`;
-      // Try to get more specific error text, but don't crash if it's not JSON
       try {
         const errorBody = await response.json();
         errorText = errorBody.error?.message || JSON.stringify(errorBody);
       } catch (e) {
-        // If parsing JSON fails, read the body as plain text as a fallback
         errorText = await response.text();
       }
       console.error("Gemini API Error:", errorText);
-      // We are now throwing an error with a more descriptive message
       throw new Error(errorText);
     }
-    // --- END OF IMPROVED BLOCK ---
     
     const data = await response.json();
-    
     const botResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't generate a response.";
-
-    // Return the successful response text
     return botResponseText;
 
   } catch (error) {
-    // This will now catch our more descriptive error from above
     console.error("Failed to send message:", error);
-    // Return a user-friendly error message to the client component
     return `Sorry, an error occurred. ${error instanceof Error ? error.message : 'Please check server logs.'}`;
   }
 }

@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.24",
+    "@heroicons/react": "^2.2.0",
     "@nanostores/react": "github:ai/react",
     "@prisma/client": "^6.18.0",
     "@vercel/postgres": "^0.10.0",
