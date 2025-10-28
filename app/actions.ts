@@ -6,6 +6,7 @@
 import { sql } from '@vercel/postgres'; // Using vercel/postgres for consistency
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import cuid from 'cuid';
 
 // --- NEW SETTINGS ACTIONS START ---
 
@@ -54,6 +55,65 @@ export async function updateGlobalPrompt(newPrompt: string) {
 }
 
 // --- NEW SETTINGS ACTIONS END ---
+
+// --- NEW PERSONA CRUD ACTIONS START ---
+
+export async function createPersona(formData: FormData) {
+  // 1. Extract and validate the data from the form
+  const personaData = {
+    name: formData.get('name') as string,
+    instruction: formData.get('instruction') as string,
+    types: (formData.get('types') as string)?.split(',').map(t => t.trim()).filter(Boolean) ?? [],
+    categories: (formData.get('categories') as string)?.split(',').map(c => c.trim()).filter(Boolean) ?? [],
+  };
+
+  if (!personaData.name || !personaData.instruction) {
+    return { error: 'Name and Instruction are required.' };
+  }
+
+  // Generate a simple key from the name for consistency
+  const key = personaData.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+  try {
+    // 2. Write the SQL to insert the new persona
+    await sql`
+      INSERT INTO "Persona" ("id", "key", "name", "instruction", "types", "categories", "isDefault")
+      VALUES (
+        ${cuid()},
+        ${`${key}-${cuid.slug()}`}, -- Ensure the key is unique
+        ${personaData.name},
+        ${personaData.instruction},
+        ${`{${personaData.types.join(',')}}`},
+        ${`{${personaData.categories.join(',')}}`},
+        false -- User-created personas are not defaults
+      );
+    `;
+
+    // 3. Revalidate Paths to show new data
+    revalidatePath('/');
+    revalidatePath('/manage');
+
+  } catch (error) {
+    console.error('Failed to create persona:', error);
+    return { error: 'Database error: Could not create persona.' };
+  }
+}
+
+export async function deletePersona(id: string) {
+  if (!id) {
+    return { error: 'ID is required to delete a persona.' };
+  }
+
+  try {
+    await sql`DELETE FROM "Persona" WHERE "id" = ${id}`;
+    revalidatePath('/');
+    revalidatePath('/manage');
+  } catch (error) {
+    console.error('Failed to delete persona:', error);
+    return { error: 'Database error: Could not delete persona.' };
+  }
+}
+// --- NEW PERSONA CRUD ACTIONS END ---
 
 
 // Define the shape of the message history we expect from the client

@@ -81,9 +81,9 @@ export default async function HomePage({
         <h1 className="text-4xl font-bold">Select a Persona</h1>
         
         <Link 
-          href="/settings" 
+          href="/manage" 
           className="absolute top-0 right-0 p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-          title="Global Settings"
+          title="Manage Personas"
         >
           <Cog6ToothIcon className="h-6 w-6" />
         </Link>
