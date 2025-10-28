@@ -1,11 +1,11 @@
 // File: app/page.tsx
 
-import { neon } from '@neondatabase/serverless';
+import { sql } from "@vercel/postgres";
 import Link from 'next/link';
-import { z } from 'zod'; // <-- 1. Import Zod
+import { z } from 'zod';
+import { PersonaFilters } from '@/components/PersonaFilters';
 
-// --- 2. Define a Zod Schema for our Persona ---
-// This schema describes the shape and types of our data.
+// Zod schema (using coerce for dates is best practice)
 const personaSchema = z.object({
   id: z.string(),
   key: z.string(),
@@ -14,46 +14,81 @@ const personaSchema = z.object({
   types: z.array(z.string()),
   categories: z.array(z.string()),
   isDefault: z.boolean(),
-  createdAt: z.date(),
+  createdAt: z.coerce.date(), // Coerce automatically converts string/number from DB to Date
 });
-
-// --- 3. Infer the TypeScript type directly from the Zod schema ---
-// Now, our type and our validation are always in sync!
 type Persona = z.infer<typeof personaSchema>;
 
-// This function fetches and VALIDATES data from our database.
-async function getPersonas(): Promise<Persona[]> {
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is not set');
+
+// --- DATA FETCHING FUNCTION WITH CORRECTED "OR" FILTERING LOGIC ---
+async function getFilteredPersonas(
+  searchQuery: string | undefined,
+  types: string[]
+): Promise<Persona[]> {
+  let query = 'SELECT * FROM "Persona"';
+  const conditions = [];
+  const params: (string | string[])[] = [];
+
+  if (searchQuery) {
+    params.push(`%${searchQuery}%`);
+    conditions.push(`"name" ILIKE $${params.length}`);
   }
-  const sql = neon(process.env.DATABASE_URL);
+
+  if (types.length > 0) {
+    params.push(types);
+    conditions.push(`("types" && $${params.length}::text[] OR "categories" && $${params.length}::text[])`);
+  }
+
+  if (conditions.length > 0) {
+    query += ` WHERE ${conditions.join(' AND ')}`;
+  }
+
+  query += ' ORDER BY "name" ASC';
+
+  console.log("EXECUTING SQL:", query);
+  console.log("WITH PARAMS:", params);
 
   try {
-    // 4. Fetch the raw data. The neon driver returns `unknown[]`.
-    const rawPersonas = await sql`
-      SELECT * FROM "Persona" ORDER BY "name" ASC
-    `;
-
-    // 5. Validate and parse the raw data using Zod.
-    // `z.array(personaSchema).parse(...)` will check if it's an array of valid personas.
-    // If validation fails, it throws a detailed error. If it succeeds, it returns the typed data.
-    const personas = z.array(personaSchema).parse(rawPersonas);
-    return personas;
-    
+    const { rows } = await sql.query(query, params);
+    return z.array(personaSchema).parse(rows);
   } catch (error) {
-    console.error('Failed to fetch or validate personas:', error);
+    console.error('Failed to fetch filtered personas:', error);
     return [];
   }
 }
 
 
-// --- The Page Component remains the same ---
-export default async function HomePage() {
-  const personas = await getPersonas();
+// --- THE HOME PAGE COMPONENT ---
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: {
+    q?: string;
+    type?: string | string[];
+  };
+}) {
+  // --- FIX APPLIED HERE ---
+  // The error message indicates that `searchParams` is a Promise.
+  // Since this is an async component, we can simply `await` it to get the value.
+  const resolvedSearchParams = await searchParams;
+
+  // Now, use the resolved object to get your values
+  const searchQuery = resolvedSearchParams?.q;
+  const types = Array.isArray(resolvedSearchParams?.type) 
+    ? resolvedSearchParams.type 
+    : resolvedSearchParams?.type 
+    ? [resolvedSearchParams.type] 
+    : [];
+  // --- END OF FIX ---
+
+  const personas = await getFilteredPersonas(searchQuery, types);
 
   return (
     <main className="container mx-auto p-4 md:p-8">
-      <h1 className="text-4xl font-bold text-center mb-8">Select a Persona</h1>
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold">Select a Persona</h1>
+      </div>
+
+      <PersonaFilters />
 
       {personas.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -71,8 +106,8 @@ export default async function HomePage() {
         </div>
       ) : (
         <div className="text-center text-gray-500 mt-16">
-          <p className="text-xl">No personas found.</p>
-          <p>Please check the database connection or run the seeding script.</p>
+          <p className="text-xl">No personas match your criteria.</p>
+          <p>Try clearing some filters to see more results.</p>
         </div>
       )}
     </main>
