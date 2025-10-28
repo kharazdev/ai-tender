@@ -1,61 +1,51 @@
 // File: app/actions.ts
-// --- MODIFIED FILE ---
+// --- FULLY CORRECTED AND FINALIZED FILE ---
 
 'use server';
 
-import { sql } from '@vercel/postgres'; // Using vercel/postgres for consistency
+import { sql } from '@vercel/postgres';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import cuid from 'cuid';
 
-// --- NEW FORM STATE TYPE ---
-export type FormState = {
-  error?: {
-    _form?: string[];
-    name?: string[];
-    [key: string]: string[] | undefined;
-  };
-} | undefined;
+// --- ROBUST ZOD SCHEMA for validating all form data ---
+const personaFormSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(3, 'Name must be at least 3 characters long.'),
+  instruction: z.string().min(10, 'Instruction must be at least 10 characters long.'),
+  types: z.string().min(1, 'You must provide at least one type.'),
+  categories: z.string().min(1, 'You must provide at least one category.'),
+});
 
-// --- NEW SETTINGS ACTIONS START ---
+function generateKey(name: string): string {
+    return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + `-${cuid.slug()}`;
+}
 
-/**
- * Fetches the global prompt from the database.
- * @returns {Promise<string>} The global prompt text, or an empty string if not found.
- */
+
+// --- SETTINGS ACTIONS (Unchanged) ---
 export async function getGlobalPrompt(): Promise<string> {
   try {
     const { rows } = await sql`SELECT value FROM "Settings" WHERE key = 'globalPrompt' LIMIT 1`;
     return rows[0]?.value || '';
   } catch (error) {
     console.error('Failed to fetch global prompt:', error);
-    return ''; // Return empty on error to prevent crashes
+    return '';
   }
 }
 
-/**
- * Updates or creates the global prompt in the database.
- * @param {string} newPrompt - The new text for the global prompt.
- * @returns {Promise<{success: boolean, message: string}>} Result object.
- */
 export async function updateGlobalPrompt(newPrompt: string) {
-  // Basic validation
   if (typeof newPrompt !== 'string') {
     return { success: false, message: 'Invalid prompt format.' };
   }
-
   try {
-    // UPSERT operation: Insert if key doesn't exist, update if it does.
     await sql`
       INSERT INTO "Settings" (key, value)
       VALUES ('globalPrompt', ${newPrompt})
       ON CONFLICT (key)
       DO UPDATE SET value = EXCLUDED.value, "updatedAt" = CURRENT_TIMESTAMP;
     `;
-    
-    // Revalidate the settings page path to show the updated value if user reloads
     revalidatePath('/settings');
-    
     return { success: true, message: 'Global prompt saved successfully!' };
   } catch (error) {
     console.error('Failed to update global prompt:', error);
@@ -63,117 +53,105 @@ export async function updateGlobalPrompt(newPrompt: string) {
   }
 }
 
-// --- NEW SETTINGS ACTIONS END ---
 
-// --- NEW PERSONA CRUD ACTIONS START ---
+// --- REFINED PERSONA CRUD ACTIONS ---
 
-export async function createPersona(previousState: FormState, formData: FormData): Promise<FormState> {
-  // 1. Extract and validate the data from the form
-  const personaData = {
-    name: formData.get('name') as string,
-    instruction: formData.get('instruction') as string,
-    types: (formData.get('types') as string)?.split(',').map(t => t.trim()).filter(Boolean) ?? [],
-    categories: (formData.get('categories') as string)?.split(',').map(c => c.trim()).filter(Boolean) ?? [],
-  };
+export async function createPersona(_prevState: unknown, formData: FormData) {
+  const validatedFields = personaFormSchema.safeParse(Object.fromEntries(formData.entries()));
 
-  if (!personaData.name || !personaData.instruction) {
-    return { error: { _form: ['Name and Instruction are required.'] } };
+  if (!validatedFields.success) {
+    return { error: validatedFields.error.flatten().fieldErrors };
   }
 
-  // Generate a simple key from the name for consistency
-  const key = personaData.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const { name, instruction, types, categories } = validatedFields.data;
+  const typesArray = types.split(',').map(t => t.trim()).filter(Boolean);
+  const categoriesArray = categories.split(',').map(c => c.trim()).filter(Boolean);
 
   try {
-    // 2. Write the SQL to insert the new persona
+    const newId = cuid();
+    const key = generateKey(name);
+    
+    // --- FIX APPLIED HERE ---
+    // Manually format the JS array into the string format PG expects: '{item1,item2}'
     await sql`
-      INSERT INTO "Persona" ("id", "key", "name", "instruction", "types", "categories", "isDefault")
-      VALUES (
-        ${cuid()},
-        ${`${key}-${cuid.slug()}`}, -- Ensure the key is unique
-        ${personaData.name},
-        ${personaData.instruction},
-        ${`{${personaData.types.join(',')}}`},
-        ${`{${personaData.categories.join(',')}}`},
-        false -- User-created personas are not defaults
-      );
+      INSERT INTO "Persona" (id, key, name, instruction, types, categories, "isDefault")
+      VALUES (${newId}, ${key}, ${name}, ${instruction}, ${'{' + typesArray.join(',') + '}'}, ${'{' + categoriesArray.join(',') + '}'}, false)
     `;
-
-    // 3. Revalidate Paths to show new data
-    revalidatePath('/');
-    revalidatePath('/manage');
-
   } catch (error) {
-    console.error('Failed to create persona:', error);
-    return { error: { _form: ['Database error: Could not create persona.'] } };
+    console.error('Database Error:', error);
+    return { error: { _form: ['Database Error: Failed to Create Persona.'] } };
   }
+
+  revalidatePath('/');
+  revalidatePath('/manage');
+  redirect('/');
 }
 
-export async function updatePersona(previousState: FormState, formData: FormData): Promise<FormState> {
-  const id = formData.get('id') as string;
-  if (!id) {
-    return { error: { _form: ['ID is required to update a persona.'] } };
-  }
+export async function updatePersona(_prevState: unknown, formData: FormData) {
+    const validatedFields = personaFormSchema.safeParse(Object.fromEntries(formData.entries()));
 
-  const personaData = {
-    name: formData.get('name') as string,
-    instruction: formData.get('instruction') as string,
-    types: (formData.get('types') as string)?.split(',').map(t => t.trim()).filter(Boolean) ?? [],
-    categories: (formData.get('categories') as string)?.split(',').map(c => c.trim()).filter(Boolean) ?? [],
-  };
+    if (!validatedFields.success) {
+        return { error: validatedFields.error.flatten().fieldErrors };
+    }
 
-  if (!personaData.name || !personaData.instruction) {
-    return { error: { name: ['Name and Instruction are required.'] } };
-  }
+    const { id, name, instruction, types, categories } = validatedFields.data;
+    if (!id) {
+        return { error: { _form: ['Persona ID is missing. Cannot update.'] } };
+    }
 
-  try {
-    await sql`
-      UPDATE "Persona"
-      SET "name" = ${personaData.name},
-          "instruction" = ${personaData.instruction},
-          "types" = ${`{${personaData.types.join(',')}}`},
-          "categories" = ${`{${personaData.categories.join(',')}}`}
-      WHERE "id" = ${id};
-    `;
+    const typesArray = types.split(',').map(t => t.trim()).filter(Boolean);
+    const categoriesArray = categories.split(',').map(c => c.trim()).filter(Boolean);
+
+    try {
+        // --- FIX APPLIED HERE ---
+        await sql`
+            UPDATE "Persona"
+            SET name = ${name}, 
+                instruction = ${instruction}, 
+                types = ${'{' + typesArray.join(',') + '}'}, 
+                categories = ${'{' + categoriesArray.join(',') + '}'}
+            WHERE id = ${id}
+        `;
+    } catch (error) {
+        console.error('Database Error:', error);
+        return { error: { _form: ['Database Error: Failed to Update Persona.'] } };
+    }
 
     revalidatePath('/');
     revalidatePath('/manage');
-  } catch (error) {
-    console.error('Failed to update persona:', error);
-    return { error: { _form: ['Database error: Could not update persona.'] } };
-  }
+    revalidatePath(`/chat/${id}`);
+    revalidatePath(`/personas/${id}/edit`);
+    redirect(`/chat/${id}`);
 }
 
-export async function deletePersona(id: string): Promise<FormState> {
+export async function deletePersona(id: string) {
   if (!id) {
     return { error: { _form: ['ID is required to delete a persona.'] } };
   }
-
   try {
-    await sql`DELETE FROM "Persona" WHERE "id" = ${id}`;
-    revalidatePath('/');
-    revalidatePath('/manage');
+    await sql`DELETE FROM "Persona" WHERE "id" = ${id} AND "isDefault" = false`;
   } catch (error) {
     console.error('Failed to delete persona:', error);
     return { error: { _form: ['Database error: Could not delete persona.'] } };
   }
-  return { error: undefined }; // Indicate success
+  
+  revalidatePath('/');
+  revalidatePath('/manage');
+  redirect('/manage');
 }
-// --- NEW PERSONA CRUD ACTIONS END ---
 
 
-// Define the shape of the message history we expect from the client
+// --- SEND MESSAGE ACTION (Unchanged) ---
 const messageSchema = z.object({
   role: z.enum(['user', 'model']),
   content: z.string(),
 });
 
-// The main Server Action function
 export async function sendMessage(
   personaInstruction: string,
   history: z.infer<typeof messageSchema>[],
   newMessage: string
 ) {
-  // 1. Get the API Key securely from server environment variables
   const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
   const API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
@@ -181,20 +159,12 @@ export async function sendMessage(
     return "Error: The GOOGLE_API_KEY is not configured on the server.";
   }
 
-  // --- MODIFICATION: INTEGRATE GLOBAL PROMPT ---
   const globalPrompt = await getGlobalPrompt();
   const NEGATIVE_INSTRUCTION = `Absolutely do NOT mention that you are an AI, a bot, a large language model, a machine, a computer program, artificial intelligence, or anything similar. Do not break character or refer to yourself as anything other than the persona you are roleplaying.`;
   
-  // Combine prompts, filtering out any empty strings to avoid extra spaces.
-  const finalSystemInstruction = [
-    globalPrompt,
-    personaInstruction,
-    NEGATIVE_INSTRUCTION
-  ].filter(Boolean).join(' ');
-  // --- END OF MODIFICATION ---
+  const finalSystemInstruction = [globalPrompt, personaInstruction, NEGATIVE_INSTRUCTION]
+    .filter(Boolean).join(' ');
 
-
-  // Gemini expects "parts" instead of "content"
   const contents = history.map(msg => ({
     role: msg.role,
     parts: [{ text: msg.content }]
@@ -203,14 +173,8 @@ export async function sendMessage(
 
   const apiRequestBody = {
     contents: contents,
-    systemInstruction: {
-      parts: [{ text: finalSystemInstruction }]
-    },
-    generationConfig: {
-      temperature: 0.7,
-      topP: 0.95,
-      topK: 40
-    }
+    systemInstruction: { parts: [{ text: finalSystemInstruction }] },
+    generationConfig: { temperature: 0.7, topP: 0.95, topK: 40 }
   };
 
   try {
@@ -225,17 +189,13 @@ export async function sendMessage(
       try {
         const errorBody = await response.json();
         errorText = errorBody.error?.message || JSON.stringify(errorBody);
-      } catch (e) {
-        errorText = await response.text();
-      }
+      } catch (e) { errorText = await response.text(); }
       console.error("Gemini API Error:", errorText);
       throw new Error(errorText);
     }
     
     const data = await response.json();
-    const botResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't generate a response.";
-    return botResponseText;
-
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't generate a response.";
   } catch (error) {
     console.error("Failed to send message:", error);
     return `Sorry, an error occurred. ${error instanceof Error ? error.message : 'Please check server logs.'}`;

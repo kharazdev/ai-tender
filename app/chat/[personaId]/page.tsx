@@ -1,11 +1,14 @@
 // File: app/chat/[personaId]/page.tsx
+// --- MODIFIED FILE ---
 
 import { neon } from '@neondatabase/serverless';
 import { notFound } from 'next/navigation';
 import { z } from 'zod';
-import ChatInterface from '@/components/ChatInterface'; // <-- 1. CRITICAL: Import the component
+import ChatInterface from '@/components/ChatInterface';
+import Link from 'next/link'; // <-- 1. IMPORT Link
+import { PencilSquareIcon } from '@heroicons/react/24/outline'; // <-- 2. IMPORT an icon
 
-// The Zod schema and Persona type can stay
+// The Zod schema and Persona type can stay (no changes)
 const personaSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -18,6 +21,7 @@ const personaSchema = z.object({
 });
 type Persona = z.infer<typeof personaSchema>;
 
+// No changes to this function
 async function getPersonaById(id: string): Promise<Persona | null> {
     if (!process.env.DATABASE_URL) {
       throw new Error('DATABASE_URL environment variable is not set');
@@ -47,16 +51,23 @@ export default async function ChatPage({ params: paramsPromise }: { params: Prom
     notFound();
   }
 
-  // This is the main UI rendering part
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
-        <div className="p-4 border-b dark:border-gray-700 text-center">
+        {/* --- 3. MODIFIED HEADER to be a flex container and add the Link --- */}
+        <div className="p-4 border-b dark:border-gray-700 flex items-center justify-center relative">
             <h1 className="text-xl font-semibold">
               Chatting with: {persona.name}
             </h1>
+            <Link
+                href={`/personas/${persona.id}/edit`}
+                className="absolute right-4 p-2 text-gray-500 hover:text-blue-500 transition-colors"
+                title="Edit Persona"
+            >
+                <PencilSquareIcon className="h-6 w-6" />
+            </Link>
         </div>
+        {/* --- END OF MODIFICATION --- */}
         
-        {/* 2. CRITICAL: Render the interactive ChatInterface component and pass the persona data to it */}
         <ChatInterface persona={persona} />
 
     </div>
