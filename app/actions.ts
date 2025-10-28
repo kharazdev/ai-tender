@@ -8,6 +8,15 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import cuid from 'cuid';
 
+// --- NEW FORM STATE TYPE ---
+export type FormState = {
+  error?: {
+    _form?: string[];
+    name?: string[];
+    [key: string]: string[] | undefined;
+  };
+} | undefined;
+
 // --- NEW SETTINGS ACTIONS START ---
 
 /**
@@ -58,7 +67,7 @@ export async function updateGlobalPrompt(newPrompt: string) {
 
 // --- NEW PERSONA CRUD ACTIONS START ---
 
-export async function createPersona(formData: FormData) {
+export async function createPersona(previousState: FormState, formData: FormData): Promise<FormState> {
   // 1. Extract and validate the data from the form
   const personaData = {
     name: formData.get('name') as string,
@@ -68,7 +77,7 @@ export async function createPersona(formData: FormData) {
   };
 
   if (!personaData.name || !personaData.instruction) {
-    return { error: 'Name and Instruction are required.' };
+    return { error: { _form: ['Name and Instruction are required.'] } };
   }
 
   // Generate a simple key from the name for consistency
@@ -95,13 +104,48 @@ export async function createPersona(formData: FormData) {
 
   } catch (error) {
     console.error('Failed to create persona:', error);
-    return { error: 'Database error: Could not create persona.' };
+    return { error: { _form: ['Database error: Could not create persona.'] } };
   }
 }
 
-export async function deletePersona(id: string) {
+export async function updatePersona(previousState: FormState, formData: FormData): Promise<FormState> {
+  const id = formData.get('id') as string;
   if (!id) {
-    return { error: 'ID is required to delete a persona.' };
+    return { error: { _form: ['ID is required to update a persona.'] } };
+  }
+
+  const personaData = {
+    name: formData.get('name') as string,
+    instruction: formData.get('instruction') as string,
+    types: (formData.get('types') as string)?.split(',').map(t => t.trim()).filter(Boolean) ?? [],
+    categories: (formData.get('categories') as string)?.split(',').map(c => c.trim()).filter(Boolean) ?? [],
+  };
+
+  if (!personaData.name || !personaData.instruction) {
+    return { error: { name: ['Name and Instruction are required.'] } };
+  }
+
+  try {
+    await sql`
+      UPDATE "Persona"
+      SET "name" = ${personaData.name},
+          "instruction" = ${personaData.instruction},
+          "types" = ${`{${personaData.types.join(',')}}`},
+          "categories" = ${`{${personaData.categories.join(',')}}`}
+      WHERE "id" = ${id};
+    `;
+
+    revalidatePath('/');
+    revalidatePath('/manage');
+  } catch (error) {
+    console.error('Failed to update persona:', error);
+    return { error: { _form: ['Database error: Could not update persona.'] } };
+  }
+}
+
+export async function deletePersona(id: string): Promise<FormState> {
+  if (!id) {
+    return { error: { _form: ['ID is required to delete a persona.'] } };
   }
 
   try {
@@ -110,8 +154,9 @@ export async function deletePersona(id: string) {
     revalidatePath('/manage');
   } catch (error) {
     console.error('Failed to delete persona:', error);
-    return { error: 'Database error: Could not delete persona.' };
+    return { error: { _form: ['Database error: Could not delete persona.'] } };
   }
+  return { error: undefined }; // Indicate success
 }
 // --- NEW PERSONA CRUD ACTIONS END ---
 
