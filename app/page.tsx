@@ -5,11 +5,9 @@ import { sql } from "@vercel/postgres";
 import Link from 'next/link';
 import { z } from 'zod';
 import { PersonaFilters } from '@/components/PersonaFilters';
-// Import a gear icon for a cleaner look (optional)
 import { Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { PersonaList } from "@/components/PersonaList"; // <-- IMPORT THE NEW COMPONENT
 
-
-// ... (personaSchema and getFilteredPersonas function remain unchanged) ...
 const personaSchema = z.object({
     id: z.string(),
     key: z.string(),
@@ -44,7 +42,7 @@ async function getFilteredPersonas(
         query += ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    query += ' ORDER BY "name" ASC';
+    query += ' ORDER BY "name" ASC'; // Keep alphabetical sorting from the server
 
     try {
         const { rows } = await sql.query(query, params);
@@ -76,10 +74,8 @@ export default async function HomePage({
 
   return (
     <main className="container mx-auto p-4 md:p-8">
-      {/* --- MODIFICATION: ADDED HEADER WITH SETTINGS LINK --- */}
       <div className="relative text-center mb-8">
         <h1 className="text-4xl font-bold">Select a Persona</h1>
-        
         <Link 
           href="/manage" 
           className="absolute top-0 right-0 p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
@@ -88,25 +84,13 @@ export default async function HomePage({
           <Cog6ToothIcon className="h-6 w-6" />
         </Link>
       </div>
-      {/* --- END OF MODIFICATION --- */}
-
 
       <PersonaFilters />
 
       {personas.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {personas.map((persona) => (
-            <Link 
-              href={`/chat/${persona.id}`}
-              key={persona.id}
-              className="group block"
-            >
-              <div className="flex flex-col items-center justify-center p-4 h-32 text-center border rounded-lg shadow-md transition-transform transform-gpu group-hover:-translate-y-1 group-hover:shadow-xl dark:border-gray-700 dark:hover:bg-gray-800">
-                <h2 className="font-semibold">{persona.name}</h2>
-              </div>
-            </Link>
-          ))}
-        </div>
+        // --- MODIFICATION: Use the PersonaList component ---
+        <PersonaList personas={personas} />
+        // --- END OF MODIFICATION ---
       ) : (
         <div className="text-center text-gray-500 mt-16">
           <p className="text-xl">No personas match your criteria.</p>
