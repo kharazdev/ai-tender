@@ -1,5 +1,5 @@
 // File: components/ChatHeader.tsx
-// --- NEW FILE ---
+// --- UPDATED FILE ---
 
 'use client';
 
@@ -13,7 +13,7 @@ type Persona = {
   id: string;
   name: string;
   types: string[];
-  categories: string[];
+  categories:string[];
 };
 
 // Helper function to get initials for the avatar
@@ -30,8 +30,10 @@ export default function ChatHeader({ persona }: { persona: Persona }) {
   const tags = [...new Set([...persona.types, ...persona.categories])];
 
   return (
-    <div className="p-4 border-b dark:border-gray-700">
-      <div className="flex items-center gap-3">
+    // --- MODIFIED LINE ---
+    // Added sticky, top-0, z-10, and background colors for light/dark mode
+    <div className="sticky top-10 z-10 p-4 border-b bg-white dark:bg-gray-800 dark:border-gray-700">
+      <div className="flex items-center gap-3   pt-3">
         {/* --- BACK BUTTON --- */}
         <button
           type="button"
