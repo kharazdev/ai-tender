@@ -5,7 +5,7 @@ import { PencilSquareIcon } from '@heroicons/react/24/outline';
 
 export default function ChatLoading() {
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="flex flex-col h-[calc(100vh-4rem)] bg-background">
       {/* Skeleton Header */}
       <div className="p-4 border-b dark:border-gray-700">
         <div className="flex items-center gap-4 animate-pulse">
