@@ -6,7 +6,7 @@
 import { useState, useRef, useEffect, FormEvent } from 'react';
 import { z } from 'zod';
 import { sendMessage } from '@/app/actions';
-import { PaperAirplaneIcon, ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/24/solid';
+import { PaperAirplaneIcon, ArrowPathIcon, ExclamationCircleIcon, TrashIcon } from '@heroicons/react/24/solid';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import clsx from 'clsx';
@@ -124,9 +124,11 @@ function ChatInput({ isLoading, onSubmit }: { isLoading: boolean; onSubmit: (val
 
 // --- MAIN ChatInterface Component ---
 export default function ChatInterface({ persona }: { persona: Persona }) {
+  const getInitialMessage = (): Message[] => [{ id: createUniqueId(), role: 'model', content: `Hello! You are now chatting with ${persona.name}.` }];
+
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window === 'undefined') {
-      return [{ id: createUniqueId(), role: 'model', content: `Hello! You are now chatting with ${persona.name}.` }];
+      return getInitialMessage();
     }
     try {
       const storageKey = getStorageKey(persona.id);
@@ -140,7 +142,7 @@ export default function ChatInterface({ persona }: { persona: Persona }) {
     } catch (error) {
       console.error("Failed to load chat history from localStorage", error);
     }
-    return [{ id: createUniqueId(), role: 'model', content: `Hello! You are now chatting with ${persona.name}.` }];
+    return getInitialMessage();
   });
   
   const [isLoading, setIsLoading] = useState(false);
@@ -166,7 +168,7 @@ export default function ChatInterface({ persona }: { persona: Persona }) {
     setIsLoading(true);
     try {
       const historyForApi = messages.filter(m => !m.isError).slice(1).map(({ role, content }) => ({ role, content }));
-      historyForApi.push({ role: 'user', content: userMessageContent }); // Add the current message for context
+      historyForApi.push({ role: 'user', content: userMessageContent });
       
       const botResponseContent = await sendMessage(persona.instruction, historyForApi, userMessageContent);
       
@@ -196,17 +198,34 @@ export default function ChatInterface({ persona }: { persona: Persona }) {
     const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
     if (!lastUserMessage) return;
     
-    // Remove the error message from the chat history
     const historyWithoutError = messages.filter(m => !m.isError);
     setMessages(historyWithoutError);
 
-    // Resubmit the last user message
     await getBotResponse(lastUserMessage.content);
   };
 
+  const handleClearChat = () => {
+    try {
+      const storageKey = getStorageKey(persona.id);
+      window.localStorage.removeItem(storageKey);
+    } catch (error) {
+      console.error("Failed to clear chat history from localStorage", error);
+    }
+    setMessages(getInitialMessage());
+  };
+
   return (
-    <div className="flex flex-col h-full bg-background">
-      <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+    <div className="relative flex flex-col h-full bg-background">
+      <button
+        type="button"
+        onClick={handleClearChat}
+        className="absolute top-4 right-4 z-10 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+        aria-label="Clear conversation"
+      >
+        <TrashIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+      </button>
+
+      <div className="flex-1 p-4 pt-16 space-y-4 overflow-y-auto">
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} onRetry={handleRetry} isLoading={isLoading} />
         ))}
