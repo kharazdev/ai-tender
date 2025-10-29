@@ -33,7 +33,7 @@ function MessageBubble({ message, onRetry, isLoading }: { message: Message; onRe
     'w-fit max-w-md lg:max-w-xl p-3 rounded-2xl shadow-md break-words',
     {
       'bg-blue-600 text-white rounded-br-lg': isUser,
-      'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-lg': !isUser && !isError,
+      'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200': !isUser && !isError,
       'bg-red-500 text-white rounded-bl-lg': isError,
     }
   );
@@ -96,7 +96,7 @@ function ChatInput({ isLoading, onSubmit }: { isLoading: boolean; onSubmit: (val
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 border-t bg-background dark:border-gray-700">
+    <form onSubmit={handleSubmit} className="p-4 border-t bg-background dark:border-gray-700 bg-background dark:border-gray-700">
       <div className="relative flex items-end">
         <textarea
           ref={textareaRef}
@@ -106,7 +106,7 @@ function ChatInput({ isLoading, onSubmit }: { isLoading: boolean; onSubmit: (val
           disabled={isLoading}
           placeholder="Type your message..."
           rows={1}
-          className="flex-1 p-2 pr-12 text-base resize-none border rounded-lg bg-gray-100 dark:bg-gray-800 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          className="flex-1 p-2 pr-12 text-base resize-none border rounded-lg bg-gray-100 dark:bg-gray-800 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-100 dark:bg-gray-800 dark:border-gray-600"
         />
         <button
           type="submit"

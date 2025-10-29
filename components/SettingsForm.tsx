@@ -38,7 +38,7 @@ export default function SettingsForm({ initialPrompt }: SettingsFormProps) {
           id="global-prompt"
           name="global-prompt"
           rows={8}
-          className="w-full p-2 border rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full p-2 border rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500 bg-gray-100 dark:bg-gray-800 dark:border-gray-600"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="e.g., Always respond in a friendly and helpful tone. Keep answers concise."

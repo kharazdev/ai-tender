@@ -1,10 +1,10 @@
 // File: app/layout.tsx
-// --- CRITICAL FIX ---
+// --- FINAL FIX ---
 
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { ThemeProvider } from '../components/ThemeProvider'; // <-- 1. IMPORT THE PROVIDER
+import { ThemeProvider } from '../components/ThemeProvider';
 import Header from '../components/Header';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -20,12 +20,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    // Add suppressHydrationWarning for next-themes compatibility
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        {/* 2. WRAP YOUR ENTIRE APP WITH THE ThemeProvider */}
+      {/* 
+        Apply base theme classes here.
+        This uses the classes Tailwind now knows about from the config,
+        which in turn use the CSS variables from globals.css.
+        All your other styles will now work correctly on top of this.
+      */}
+      <body className={`${inter.className} bg-background text-foreground`}>
         <ThemeProvider
-          attribute="class" // <-- THIS IS THE MOST CRITICAL PROP!
+          attribute="class" // This now works perfectly
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
