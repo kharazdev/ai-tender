@@ -1,11 +1,11 @@
 // File: app/layout.tsx
-// --- CRITICAL FIX ---
+// --- NEW OR REPLACED FILE ---
 
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { ThemeProvider } from '../components/ThemeProvider'; // <-- 1. IMPORT THE PROVIDER
-import Header from '../components/Header';
+import { ThemeProvider } from '@/components/ThemeProvider'; // <-- IMPORT
+import Header from '@/components/Header'; // <-- IMPORT
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -20,18 +20,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    // Add suppressHydrationWarning for next-themes compatibility
+    // This 'suppressHydrationWarning' is important for next-themes
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        {/* 2. WRAP YOUR ENTIRE APP WITH THE ThemeProvider */}
+        {/* The ThemeProvider wraps everything, enabling theme changes */}
         <ThemeProvider
-          attribute="class" // <-- THIS IS THE MOST CRITICAL PROP!
+          attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
+          {/* The Header is now part of the layout, appearing on all pages */}
           <Header />
-          {children}
+          
+          {/* 'children' will be the content of your individual pages */}
+          <main>{children}</main>
         </ThemeProvider>
       </body>
     </html>
