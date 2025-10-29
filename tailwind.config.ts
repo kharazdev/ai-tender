@@ -1,9 +1,10 @@
 // File: tailwind.config.ts
+// --- ADD THIS EXTENSION ---
 
 import type { Config } from 'tailwindcss'
 
 const config: Config = {
-  darkMode: 'class', // <-- VERIFY THIS LINE EXISTS
+  darkMode: 'class', // This is correct
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -11,7 +12,12 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      // ... your theme extensions
+      // V-- THIS IS THE KEY ADDITION --V
+      colors: {
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+      },
+      // ^-- THIS IS THE KEY ADDITION --^
     },
   },
   plugins: [],

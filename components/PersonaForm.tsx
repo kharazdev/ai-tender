@@ -64,7 +64,7 @@ export default function PersonaForm({ persona }: PersonaFormProps) {
   }, [state]);
 
   return (
-    <form action={formAction} className="max-w-2xl mx-auto space-y-6">
+    <form action={formAction} className="max-w-2xl mx-auto space-y-6 bg-background dark:border-gray-700">
       {isEditing && <input type="hidden" name="id" value={persona.id} />}
       
       {/* --- FIX #2 APPLIED BELOW --- */}
@@ -77,7 +77,7 @@ export default function PersonaForm({ persona }: PersonaFormProps) {
 
       <div>
         <label htmlFor="instruction" className="block text-sm font-medium mb-1">System Instruction (Prompt)</label>
-        <textarea id="instruction" name="instruction" defaultValue={persona?.instruction} required rows={10} className="w-full p-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600" />
+        <textarea id="instruction" name="instruction" defaultValue={persona?.instruction} required rows={10} className="w-full p-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 dark:border-gray-600" />
         {fieldErrors?.instruction && <p className="text-red-500 text-xs mt-1">{fieldErrors.instruction[0]}</p>}
       </div>
 
