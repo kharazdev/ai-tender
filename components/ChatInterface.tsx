@@ -88,7 +88,7 @@ interface ChatInterfaceProps {
   onRetry: () => void;
   onSpeak: (text: string) => void;
   speechSynthesisSupported: boolean;
-  chatEndRef: RefObject<HTMLDivElement>;
+  chatEndRef: RefObject<HTMLDivElement | null>;
 }
 
 // --- MAIN (SIMPLIFIED) ChatInterface Component ---
