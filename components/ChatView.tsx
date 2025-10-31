@@ -42,8 +42,8 @@ export default function ChatView({ persona }: { persona: Persona }) {
   const [speechSynthesisSupported, setSpeechSynthesisSupported] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState('');
-  const [pitch, setPitch] = useState(1.7); // <-- UPDATED DEFAULT
-  const [rate, setRate] = useState(1.3); // <-- UPDATED DEFAULT
+  const [pitch, setPitch] = useState(1.6); // <-- UPDATED DEFAULT
+  const [rate, setRate] = useState(1.1); // <-- UPDATED DEFAULT
   const [autoSpeakEnabled, setAutoSpeakEnabled] = useState(true);
 
   // Speech Recognition State
