@@ -1,5 +1,5 @@
 // File: components/ChatView.tsx
-// --- FINAL, FULLY CORRECTED AND ROBUST VERSION ---
+// --- FINAL CORRECTED FILE ---
 'use client';
 
 import { useState, useRef, useEffect, FormEvent, useCallback } from 'react';
@@ -31,7 +31,10 @@ export default function ChatView({ persona }: { persona: Persona }) {
     try {
       const savedHistory = window.localStorage.getItem(getStorageKey(persona.id));
       return savedHistory ? JSON.parse(savedHistory) : getInitialMessage();
-    } catch (error) { console.error("Failed to load chat history:", error); return getInitialMessage(); }
+    } catch (error) {
+      console.error("Failed to load chat history:", error);
+      return getInitialMessage();
+    }
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -43,13 +46,23 @@ export default function ChatView({ persona }: { persona: Persona }) {
   const [selectedVoiceURI, setSelectedVoiceURI] = useState('');
   const [pitch, setPitch] = useState<number>(() => {
     if (typeof window === 'undefined') return 1.6;
-    try { const savedPitch = window.localStorage.getItem(PITCH_STORAGE_KEY); return savedPitch ? parseFloat(savedPitch) : 1.6; } 
-    catch (error) { console.error("Failed to load pitch from storage:", error); return 1.6; }
+    try {
+      const savedPitch = window.localStorage.getItem(PITCH_STORAGE_KEY);
+      return savedPitch ? parseFloat(savedPitch) : 1.6;
+    } catch (error) {
+      console.error("Failed to load pitch from storage:", error);
+      return 1.6;
+    }
   });
   const [rate, setRate] = useState<number>(() => {
     if (typeof window === 'undefined') return 1.1;
-    try { const savedRate = window.localStorage.getItem(RATE_STORAGE_KEY); return savedRate ? parseFloat(savedRate) : 1.1; } 
-    catch (error) { console.error("Failed to load rate from storage:", error); return 1.1; }
+    try {
+      const savedRate = window.localStorage.getItem(RATE_STORAGE_KEY);
+      return savedRate ? parseFloat(savedRate) : 1.1;
+    } catch (error) {
+      console.error("Failed to load rate from storage:", error);
+      return 1.1;
+    }
   });
   const [autoSpeakEnabled, setAutoSpeakEnabled] = useState(true);
 
@@ -61,9 +74,6 @@ export default function ChatView({ persona }: { persona: Persona }) {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const autoSendEnabledRef = useRef(autoSendEnabled);
-  const isListeningRef = useRef(isListening);
-  const isBotSpeakingRef = useRef(false);
-  const isProcessingRef = useRef(false);
 
   // --- CORE LOGIC & HANDLERS ---
   const handleSendMessage = useCallback(async (input: string) => {
@@ -88,45 +98,25 @@ export default function ChatView({ persona }: { persona: Persona }) {
 
   const handlePitchChange = (newPitch: number) => {
     setPitch(newPitch);
-    try { window.localStorage.setItem(PITCH_STORAGE_KEY, newPitch.toString()); } 
-    catch (error) { console.error("Failed to save pitch to storage:", error); }
+    try {
+      window.localStorage.setItem(PITCH_STORAGE_KEY, newPitch.toString());
+    } catch (error) {
+      console.error("Failed to save pitch to storage:", error);
+    }
   };
 
   const handleRateChange = (newRate: number) => {
     setRate(newRate);
-    try { window.localStorage.setItem(RATE_STORAGE_KEY, newRate.toString()); } 
-    catch (error) { console.error("Failed to save rate to storage:", error); }
+    try {
+      window.localStorage.setItem(RATE_STORAGE_KEY, newRate.toString());
+    } catch (error) {
+      console.error("Failed to save rate to storage:", error);
+    }
   };
 
   const handleSpeak = useCallback((text: string) => {
     if (!speechSynthesisSupported) return;
     const utterance = new SpeechSynthesisUtterance(text);
-
-    utterance.onstart = () => { isBotSpeakingRef.current = true; };
-
-    utterance.onend = () => {
-      isBotSpeakingRef.current = false;
-      if (recognitionRef.current && isListeningRef.current) {
-        // Add a small delay before restarting recognition.
-        // This prevents the mic from picking up the "echo" of the bot's last word.
-        setTimeout(() => {
-          // Re-check in case user stopped it during the timeout
-          if (recognitionRef.current && isListeningRef.current) { 
-             recognitionRef.current.start();
-          }
-        }, 250); // 250ms is a good balance of responsiveness and safety.
-      }
-    };
-
-    utterance.onerror = (event) => {
-      console.error("SpeechSynthesis Error", event);
-      isBotSpeakingRef.current = false;
-      // Also restart here to prevent getting stuck
-      if (recognitionRef.current && isListeningRef.current) {
-        recognitionRef.current.start();
-      }
-    };
-
     const selectedVoice = voices.find(v => v.voiceURI === selectedVoiceURI);
     if (selectedVoice) utterance.voice = selectedVoice;
     utterance.pitch = pitch;
@@ -139,14 +129,12 @@ export default function ChatView({ persona }: { persona: Persona }) {
   
   const handleListen = () => {
     if (!recognitionRef.current) return;
-    
     if (isListening) {
-      setIsListening(false);
       recognitionRef.current.stop();
     } else {
-      window.speechSynthesis.cancel();
+            window.speechSynthesis.cancel(); // <-- ADD THIS LINE
+
       setInputValue('');
-      setIsListening(true);
       recognitionRef.current.start();
     }
   };
@@ -166,23 +154,13 @@ export default function ChatView({ persona }: { persona: Persona }) {
   };
 
   // --- LIFECYCLE & EFFECTS ---
-  useEffect(() => { 
-    handleSendMessageRef.current = handleSendMessage; 
-    autoSendEnabledRef.current = autoSendEnabled; 
-    isListeningRef.current = isListening;
-  }, [handleSendMessage, autoSendEnabled, isListening]);
-
+  useEffect(() => { handleSendMessageRef.current = handleSendMessage; autoSendEnabledRef.current = autoSendEnabled; }, [handleSendMessage, autoSendEnabled]);
   useEffect(() => { if (messages.length > 1) window.localStorage.setItem(getStorageKey(persona.id), JSON.stringify(messages)); }, [messages, persona.id]);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
   
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     if (autoSpeakEnabled && lastMessage?.role === 'model' && !lastMessage.isError) {
-      // Proactively stop listening before the bot speaks.
-      if (recognitionRef.current && isListeningRef.current) {
-        recognitionRef.current.stop();
-      }
       handleSpeak(lastMessage.content);
     }
   }, [messages, autoSpeakEnabled, handleSpeak]);
@@ -194,41 +172,19 @@ export default function ChatView({ persona }: { persona: Persona }) {
     
     const recognition = new SpeechRecognitionAPI();
     recognitionRef.current = recognition;
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    
-    recognition.onstart = () => { isProcessingRef.current = false; };
-    
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => { 
-      console.error('Speech recognition error:', event.error);
-      if (event.error !== 'no-speech' && event.error !== 'audio-capture') { setIsListening(false); }
-      isProcessingRef.current = false;
-    };
-    
-    recognition.onend = () => {
-      // This logic restarts listening if the user's intent is still 'on' and the bot isn't speaking.
-      // The main start command is now handled by the handleSpeak.onend handler for a cleaner flow.
-      if (isListeningRef.current && !isBotSpeakingRef.current) {
-        recognition.start();
-      }
-    };
+    recognition.continuous = false; recognition.interimResults = true;
+    recognition.onstart = () => setIsListening(true);
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => { console.error('Speech recognition error:', event.error); setIsListening(false); };
+    recognition.onend = () => setIsListening(false);
     
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      // Ignore results if the bot is speaking or we're already handling a final result.
-      if (isBotSpeakingRef.current || isProcessingRef.current) return;
-      
       const transcript = Array.from(event.results).map((result) => result[0].transcript).join('');
       setInputValue(transcript);
-
-      const lastResult = event.results[event.results.length - 1];
-      if (lastResult.isFinal && autoSendEnabledRef.current && transcript.trim()) {
-        isProcessingRef.current = true;
+      if (event.results[event.results.length - 1].isFinal && autoSendEnabledRef.current && transcript.trim()) {
         handleSendMessageRef.current(transcript.trim());
         setInputValue('');
-        if (recognitionRef.current) { recognitionRef.current.stop(); }
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -237,16 +193,29 @@ export default function ChatView({ persona }: { persona: Persona }) {
       if (!('speechSynthesis' in window)) return;
       const availableVoices = window.speechSynthesis.getVoices();
       if (availableVoices.length === 0) return;
+
       setVoices(availableVoices);
+      
       if (availableVoices.length > 0 && !selectedVoiceURI) {
         const femaleKeywords = ['female', 'woman', 'girl', 'zira', 'susan', 'fiona', 'samantha'];
-        const femaleVoice = availableVoices.find(voice => femaleKeywords.some(keyword => voice.name.toLowerCase().includes(keyword)));
-        if (femaleVoice) { setSelectedVoiceURI(femaleVoice.voiceURI); } 
-        else { const defaultVoice = availableVoices.find(v => v.default); setSelectedVoiceURI(defaultVoice?.voiceURI || availableVoices[0].voiceURI); }
+        const femaleVoice = availableVoices.find(voice =>
+          femaleKeywords.some(keyword => voice.name.toLowerCase().includes(keyword))
+        );
+
+        if (femaleVoice) {
+          setSelectedVoiceURI(femaleVoice.voiceURI);
+        } else {
+          const defaultVoice = availableVoices.find(v => v.default);
+          setSelectedVoiceURI(defaultVoice?.voiceURI || availableVoices[0].voiceURI);
+        }
       }
     };
-    if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) { window.speechSynthesis.onvoiceschanged = populateVoiceList; }
+    
+    if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = populateVoiceList;
+    }
     populateVoiceList();
+
   }, [selectedVoiceURI]);
 
   // --- RENDER ---
