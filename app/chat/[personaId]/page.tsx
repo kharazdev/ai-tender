@@ -1,11 +1,10 @@
 // File: app/chat/[personaId]/page.tsx
-// --- UPDATED AND SIMPLIFIED FILE ---
+// --- UPDATED FILE ---
 
 import { neon } from '@neondatabase/serverless';
 import { notFound } from 'next/navigation';
 import { z } from 'zod';
-import ChatInterface from '@/components/ChatInterface';
-import ChatHeader from '@/components/ChatHeader'; // <-- 1. IMPORT THE NEW HEADER COMPONENT
+import ChatView from '@/components/ChatView'; // 1. Import the new wrapper component
 
 // The Zod schema and Persona type can stay (no changes)
 const personaSchema = z.object({
@@ -46,13 +45,6 @@ export default async function ChatPage({ params: paramsPromise }: { params: Prom
     notFound();
   }
 
-  return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] bg-background">
-        {/* 2. RENDER THE NEW CHATHEADER AND PASS THE PERSONA DATA */}
-        <ChatHeader persona={persona} />
-        
-        {/* The ChatInterface component remains unchanged */}
-        <ChatInterface persona={persona} />
-    </div>
-  );
+  // 2. Render the single client wrapper component, passing the server-fetched data
+  return <ChatView persona={persona} />;
 }
