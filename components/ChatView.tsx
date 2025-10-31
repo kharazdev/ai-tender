@@ -1,5 +1,5 @@
 // File: components/ChatView.tsx
-// --- NEW FILE ---
+// --- FINAL CORRECTED FILE ---
 'use client';
 
 import { useState, useRef, useEffect, FormEvent, useCallback } from 'react';
@@ -42,8 +42,8 @@ export default function ChatView({ persona }: { persona: Persona }) {
   const [speechSynthesisSupported, setSpeechSynthesisSupported] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState('');
-  const [pitch, setPitch] = useState(1);
-  const [rate, setRate] = useState(1);
+  const [pitch, setPitch] = useState(1.7); // <-- UPDATED DEFAULT
+  const [rate, setRate] = useState(1.3); // <-- UPDATED DEFAULT
   const [autoSpeakEnabled, setAutoSpeakEnabled] = useState(true);
 
   // Speech Recognition State
@@ -134,11 +134,11 @@ export default function ChatView({ persona }: { persona: Persona }) {
     recognitionRef.current = recognition;
     recognition.continuous = false; recognition.interimResults = true;
     recognition.onstart = () => setIsListening(true);
-    recognition.onerror = (event: any) => { console.error('Speech recognition error:', event.error); setIsListening(false); };
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => { console.error('Speech recognition error:', event.error); setIsListening(false); };
     recognition.onend = () => setIsListening(false);
     
-    recognition.onresult = (event: any) => {
-      const transcript = Array.from(event.results).map((result: any) => result[0].transcript).join('');
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = Array.from(event.results).map((result) => result[0].transcript).join('');
       setInputValue(transcript);
       if (event.results[event.results.length - 1].isFinal && autoSendEnabledRef.current && transcript.trim()) {
         handleSendMessageRef.current(transcript.trim());
@@ -150,16 +150,32 @@ export default function ChatView({ persona }: { persona: Persona }) {
   useEffect(() => {
     setSpeechSynthesisSupported('speechSynthesis' in window);
     const populateVoiceList = () => {
+      if (!('speechSynthesis' in window)) return;
       const availableVoices = window.speechSynthesis.getVoices();
+      if (availableVoices.length === 0) return;
+
       setVoices(availableVoices);
+      
       if (availableVoices.length > 0 && !selectedVoiceURI) {
-        setSelectedVoiceURI(availableVoices.find(v => v.default)?.voiceURI || availableVoices[0].voiceURI);
+        const femaleKeywords = ['female', 'woman', 'girl', 'zira', 'susan', 'fiona', 'samantha'];
+        const femaleVoice = availableVoices.find(voice =>
+          femaleKeywords.some(keyword => voice.name.toLowerCase().includes(keyword))
+        );
+
+        if (femaleVoice) {
+          setSelectedVoiceURI(femaleVoice.voiceURI);
+        } else {
+          const defaultVoice = availableVoices.find(v => v.default);
+          setSelectedVoiceURI(defaultVoice?.voiceURI || availableVoices[0].voiceURI);
+        }
       }
     };
-    populateVoiceList();
+    
     if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) {
       window.speechSynthesis.onvoiceschanged = populateVoiceList;
     }
+    populateVoiceList();
+
   }, [selectedVoiceURI]);
 
   // --- RENDER ---
