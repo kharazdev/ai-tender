@@ -94,6 +94,8 @@ export default function ChatView({ persona }: { persona: Persona }) {
     if (isListening) {
       recognitionRef.current.stop();
     } else {
+            window.speechSynthesis.cancel(); // <-- ADD THIS LINE
+
       setInputValue('');
       recognitionRef.current.start();
     }
