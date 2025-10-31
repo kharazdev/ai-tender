@@ -19,6 +19,8 @@ type Message = { id: string; role: 'user' | 'model'; content: string; isError?: 
 // --- HELPER FUNCTIONS ---
 const createUniqueId = () => `${Date.now()}-${Math.random()}`;
 const getStorageKey = (personaId: string) => `chat_history_${personaId}_${new Date().toISOString().split('T')[0]}`;
+const PITCH_STORAGE_KEY = 'speech_pitch';
+const RATE_STORAGE_KEY = 'speech_rate';
 
 export default function ChatView({ persona }: { persona: Persona }) {
   // --- STATE MANAGEMENT ---
@@ -42,8 +44,26 @@ export default function ChatView({ persona }: { persona: Persona }) {
   const [speechSynthesisSupported, setSpeechSynthesisSupported] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState('');
-  const [pitch, setPitch] = useState(1.6); // <-- UPDATED DEFAULT
-  const [rate, setRate] = useState(1.1); // <-- UPDATED DEFAULT
+  const [pitch, setPitch] = useState<number>(() => {
+    if (typeof window === 'undefined') return 1.6;
+    try {
+      const savedPitch = window.localStorage.getItem(PITCH_STORAGE_KEY);
+      return savedPitch ? parseFloat(savedPitch) : 1.6;
+    } catch (error) {
+      console.error("Failed to load pitch from storage:", error);
+      return 1.6;
+    }
+  });
+  const [rate, setRate] = useState<number>(() => {
+    if (typeof window === 'undefined') return 1.1;
+    try {
+      const savedRate = window.localStorage.getItem(RATE_STORAGE_KEY);
+      return savedRate ? parseFloat(savedRate) : 1.1;
+    } catch (error) {
+      console.error("Failed to load rate from storage:", error);
+      return 1.1;
+    }
+  });
   const [autoSpeakEnabled, setAutoSpeakEnabled] = useState(true);
 
   // Speech Recognition State
@@ -75,6 +95,24 @@ export default function ChatView({ persona }: { persona: Persona }) {
     } finally { setIsLoading(false); }
   }, [isLoading, messages, persona.instruction]);
   const handleSendMessageRef = useRef(handleSendMessage);
+
+  const handlePitchChange = (newPitch: number) => {
+    setPitch(newPitch);
+    try {
+      window.localStorage.setItem(PITCH_STORAGE_KEY, newPitch.toString());
+    } catch (error) {
+      console.error("Failed to save pitch to storage:", error);
+    }
+  };
+
+  const handleRateChange = (newRate: number) => {
+    setRate(newRate);
+    try {
+      window.localStorage.setItem(RATE_STORAGE_KEY, newRate.toString());
+    } catch (error) {
+      console.error("Failed to save rate to storage:", error);
+    }
+  };
 
   const handleSpeak = useCallback((text: string) => {
     if (!speechSynthesisSupported) return;
@@ -190,9 +228,9 @@ export default function ChatView({ persona }: { persona: Persona }) {
         selectedVoiceURI={selectedVoiceURI}
         onVoiceChange={setSelectedVoiceURI}
         pitch={pitch}
-        onPitchChange={setPitch}
+        onPitchChange={handlePitchChange}
         rate={rate}
-        onRateChange={setRate}
+        onRateChange={handleRateChange}
         autoSpeakEnabled={autoSpeakEnabled}
         onAutoSpeakChange={setAutoSpeakEnabled}
         autoSendEnabled={autoSendEnabled}
